@@ -18,7 +18,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SRC="$HERE/$UUID"
 DEST_ROOT="$HOME/.local/share/cinnamon/extensions"
 DEST="$DEST_ROOT/$UUID"
-LOCALE_ROOT="$HOME/.local/share/locale"
+LOCALE_ROOT="${XDG_DATA_HOME:-$HOME/.local/share}/locale"
 CONFIG_DIRS=("$HOME/.config/cinnamon/spices/$UUID" "$HOME/.cinnamon/configs/$UUID")
 
 info() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }

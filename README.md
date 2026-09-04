@@ -11,7 +11,7 @@ A Cinnamon extension that downloads the Bing image of the day and sets it as you
 - Optional plain-text overlay in the top-right corner of the desktop showing the title, copyright and date of the current image (text color, text effect, characters per line and font size are adjustable)
 - Notification with thumbnail, title and copyright when the wallpaper changes
 - Settings buttons: refresh now, open the image description on Bing, open the wallpaper folder
-- Translated UI (gettext, zh_CN included); tested on Linux Mint 22.3 / Cinnamon 6.6, compatible with Cinnamon 5.0–7.0 (libsoup 2 and 3)
+- Translated UI (gettext, zh_CN included); tested on Linux Mint 22.3 / Cinnamon 6.6, compatible with Cinnamon 5.4–7.0 (libsoup 2 and 3)
 
 ## Layout
 
