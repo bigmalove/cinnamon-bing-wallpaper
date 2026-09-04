@@ -1,0 +1,9 @@
+# editor / OS junk
+*~
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# compiled translations
+*.mo
