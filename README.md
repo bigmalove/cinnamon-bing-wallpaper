@@ -1,96 +1,102 @@
-# Bing Wallpaper — Linux Mint (Cinnamon) 扩展
+# Bing Wallpaper for Linux Mint (Cinnamon)
 
-自动获取 Bing 每日一图并设置为桌面壁纸的 Cinnamon 扩展（Extension）。
+[中文说明 / Chinese README](README.zh-CN.md)
 
-- 每天自动下载 Bing 首页图片（默认 4K UHD），并设为系统壁纸
-- 可选地区（中国 / 美国 / 日本 … 或跟随系统语言）、分辨率、图片显示方式
-- 断网、代理、登录时网络未就绪等情况自动重试；联网恢复后立即补拉
-- 图片保存到「图片/BingWallpapers」目录（可改），自动清理旧图（只删除本扩展下载的文件）
-- 壁纸更换时弹出通知，显示图片标题与版权说明
-- 设置面板提供「立即刷新 / 查看当前图片信息 / 在 Bing 上查看介绍 / 打开壁纸目录」按钮
-- 界面支持中文（gettext 翻译），已在 Linux Mint 22.3 / Cinnamon 6.6 上测试；兼容 Cinnamon 5.0–7.0（libsoup 2 与 3 均支持）
+A Cinnamon extension that downloads the Bing image of the day and sets it as your desktop wallpaper.
 
-## 目录结构
+- Downloads the Bing homepage image every day (4K UHD by default) and applies it as the system wallpaper
+- Region (China, US, Japan, … or follow the system language), resolution and picture aspect are configurable
+- Retries automatically when the network is down, behind a proxy, or not ready yet at login; catches up as soon as the connection is back
+- Saves images to `Pictures/BingWallpapers` (configurable) and prunes old ones (only files it created itself)
+- Optional plain-text overlay in the top-right corner of the desktop showing the title, copyright and date of the current image (text color, text effect, characters per line and font size are adjustable)
+- Notification with thumbnail, title and copyright when the wallpaper changes
+- Settings buttons: refresh now, open the image description on Bing, open the wallpaper folder
+- Translated UI (gettext, zh_CN included); tested on Linux Mint 22.3 / Cinnamon 6.6, compatible with Cinnamon 5.0–7.0 (libsoup 2 and 3)
+
+## Layout
 
 ```
-bingwallpaper/
-├── install.sh                          # 安装 / 更新 / 卸载脚本
-├── README.md
-└── bing-wallpaper@bigmalove/            # 扩展本体（UUID = 目录名）
-    ├── metadata.json                   # 扩展元数据（名称、兼容的 Cinnamon 版本）
-    ├── extension.js                    # 主逻辑
-    ├── settings-schema.json            # 设置面板定义
-    ├── icon.png / icon.svg             # 图标
-    └── po/                             # 翻译（zh_CN.po 及 .pot 模板）
+cinnamon-bing-wallpaper/
+├── install.sh                          # install / update / uninstall helper
+├── README.md                           # this file
+├── README.zh-CN.md                     # Chinese documentation
+└── bing-wallpaper@bigmalove/           # the extension itself (UUID = folder name)
+    ├── metadata.json                   # name, author, compatible Cinnamon versions
+    ├── extension.js                    # main logic
+    ├── settings-schema.json            # settings dialog definition
+    ├── stylesheet.css                  # styling of the image information shown on the desktop
+    ├── icon.png / icon.svg             # icon
+    └── po/                             # translations (zh_CN.po and the .pot template)
 ```
 
-## 安装
+## Installation
 
 ```bash
-bash install.sh            # 复制到 ~/.local/share/cinnamon/extensions/ 并启用
-bash install.sh status     # 查看是否已安装/启用、当前壁纸、最近日志
+bash install.sh            # copy to ~/.local/share/cinnamon/extensions/ and enable
+bash install.sh status     # installed? enabled? current wallpaper, recent log lines
 ```
 
-启用后几秒钟内会拉取第一张图片。若不想立刻启用，使用 `bash install.sh --no-enable`，之后在
-「系统设置 → 扩展」中手动启用。
+The first image is fetched a few seconds after the extension is enabled. Use `bash install.sh --no-enable`
+if you prefer to enable it yourself in *System Settings → Extensions*.
 
-手动安装（不使用脚本）：把 `bing-wallpaper@bigmalove` 目录复制到
-`~/.local/share/cinnamon/extensions/`，然后在「系统设置 → 扩展」里启用；中文界面需要另外执行
-`msgfmt -o ~/.local/share/locale/zh_CN/LC_MESSAGES/bing-wallpaper@bigmalove.mo bing-wallpaper@bigmalove/po/zh_CN.po`。
+Manual installation: copy the `bing-wallpaper@bigmalove` folder to `~/.local/share/cinnamon/extensions/`
+and enable it in *System Settings → Extensions*. For a translated UI compile the catalog, e.g.
+`msgfmt -o ~/.local/share/locale/zh_CN/LC_MESSAGES/bing-wallpaper@bigmalove.mo bing-wallpaper@bigmalove/po/zh_CN.po`.
 
-## 设置
+## Settings
 
-「系统设置 → 扩展 → Bing 壁纸 → 齿轮图标」打开设置面板：
+Open *System Settings → Extensions → Bing Wallpaper → configure (gear icon)*.
 
-| 页面 | 选项 | 说明 |
+| Page | Option | Notes |
 | --- | --- | --- |
-| 常规 | Bing 地区 | 默认「自动」，根据系统语言选择市场（中文系统即 zh-CN）。部分地区每日图片不同 |
-| 常规 | 图片分辨率 | 默认 4K UHD；若某张图没有该分辨率，自动退回 1920x1200 / 1920x1080 |
-| 常规 | 图片显示方式 | 对应系统的 picture-options（放大、缩放、拉伸、居中、跨屏、马赛克），也可选择「保持系统当前设置」 |
-| 常规 | 壁纸更换时显示通知 | 通知中显示图片标题、版权信息和缩略图 |
-| 常规 | 操作按钮 | 立即刷新 / 显示当前图片信息 / 在 Bing 上查看介绍 / 打开壁纸目录 |
-| 存储与更新 | 壁纸保存位置 | 留空为 `~/图片/BingWallpapers`（跟随 XDG 图片目录） |
-| 存储与更新 | 保留的图片数量 | 默认 30 张，超出的旧图自动删除；只删除文件名形如 `20260903_xxx.jpg` 的本扩展文件 |
-| 存储与更新 | 检查新图片的间隔 | 默认 60 分钟。Bing 每天一图，检查请求非常小 |
-| 存储与更新 | 按流量计费的网络下不下载 | 默认关闭 |
+| General | Bing region (market) | Default *Automatic*: derived from the system language (zh-CN on a Chinese system). Some regions publish a different image |
+| General | Image resolution | Default 4K UHD; falls back to 1920x1200 / 1920x1080 when an image is not available in that size |
+| General | Picture aspect | Maps to the system `picture-options` (zoom, scaled, stretched, centered, spanned, mosaic) or *keep the current system setting* |
+| General | Show a notification when the wallpaper changes | Title, copyright and a thumbnail |
+| General | Show image information on the desktop | Plain text in the top-right corner (below the panel) with title, copyright and date. It sits on the desktop behind windows. Adjustable: text color, text effect (none, shadow, strong shadow, glow, outline, background block), characters per line, font size |
+| General | Buttons | Refresh now / Open the image description on Bing / Open the wallpaper folder |
+| Storage and updates | Save wallpapers to | Empty = `~/Pictures/BingWallpapers` (follows the XDG Pictures directory) |
+| Storage and updates | Number of downloaded images to keep | Default 30; only files named like `20260903_xxx.jpg` created by this extension are deleted |
+| Storage and updates | Check for a new image every | Default 60 minutes. Bing publishes one image per day; a check is a tiny request |
+| Storage and updates | Do not download on metered connections | Off by default |
 
-## 工作方式
+## How it works
 
-1. 请求 `https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=1&mkt=<地区>` 获取当天图片信息。
-2. 按 `日期_图片ID_分辨率.jpg` 命名（例如 `20260903_Westerheversand_ZH-CN0517707643_UHD.jpg`），若文件已存在则不重复下载。
-3. 下载完成后写入 `org.cinnamon.desktop.background picture-uri`（以及 picture-options），并清理旧图。
-   如果 Cinnamon 自带的「背景幻灯片」处于开启状态，会被关闭，否则它会立刻覆盖壁纸。
-4. 每隔设定的间隔重新检查；失败时按 30s → 60s → 2min → 5min → 10min → 30min 退避重试，连续失败 3 次会弹出一次通知。
-   网络恢复（NetworkMonitor 信号）时也会触发检查。
-5. 当天图片已经设置过之后，如果你手动换了别的壁纸，扩展不会在当天再把它改回来；第二天有新图时才会更新。
-   点击「立即刷新」则总是重新应用当天的图片。
+1. Requests `https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=1&mkt=<region>` for today's image metadata.
+2. Saves the image as `<date>_<image id>_<resolution>.jpg` (for example `20260903_Westerheversand_ZH-CN0517707643_UHD.jpg`); an existing file is not downloaded again.
+3. Writes `org.cinnamon.desktop.background picture-uri` (and `picture-options`), then prunes old images.
+   Cinnamon's built-in background slideshow is turned off if it is running, otherwise it would override the wallpaper immediately.
+4. Checks again at the configured interval; after a failure it backs off 30 s → 60 s → 2 min → 5 min → 10 min → 30 min and shows one notification after three consecutive failures.
+   A check is also triggered when the network comes back (NetworkMonitor signal).
+5. Once today's image has been applied, a wallpaper you pick by hand is left alone for the rest of the day; the next new image replaces it.
+   *Refresh now* always re-applies today's image.
 
-网络请求使用 GLib/libsoup，自动遵循系统代理设置（环境变量或「网络 → 代理」）。
+HTTP requests go through GLib/libsoup and honour the system proxy (environment variables or *Network → Proxy*).
 
-## 常见问题
+## Troubleshooting
 
-- **壁纸没有变化**：运行 `bash install.sh status` 查看最近日志；或查看 `~/.xsession-errors` 中带
-  `[bing-wallpaper@bigmalove]` 前缀的行。也可以按 Alt+F2 输入 `lg` 打开 Melange 查看日志。
-- **只想用某个地区的图**：在设置里把「Bing 地区」从「自动」改为具体地区，会立刻重新获取。
-- **想换回原来的壁纸**：在「系统设置 → 扩展」中禁用本扩展，然后在「系统设置 → 背景」里选择壁纸即可；
-  下载过的图片仍保留在壁纸目录中。
+- **The wallpaper does not change**: run `bash install.sh status` for the recent log lines, or look for lines prefixed with
+  `[bing-wallpaper@bigmalove]` in `~/.xsession-errors`. Alt+F2, `lg` opens Melange with the same log.
+- **I want a specific region**: switch *Bing region* from *Automatic* to a region; the image is fetched immediately.
+- **Back to my old wallpaper**: disable the extension in *System Settings → Extensions* and pick a wallpaper in *Backgrounds*.
+  Downloaded images stay in the wallpaper folder.
 
-## 卸载
-
-```bash
-bash install.sh uninstall           # 禁用并删除扩展，保留已下载图片和设置
-bash install.sh uninstall --purge   # 同时删除设置
-```
-
-## 开发
+## Uninstall
 
 ```bash
-bash install.sh --link     # 以符号链接方式安装，改代码后无需重新复制
-bash install.sh reload     # 通过 DBus 让 Cinnamon 重新加载扩展
+bash install.sh uninstall           # disable and remove; keeps downloaded images and settings
+bash install.sh uninstall --purge   # also remove the saved settings
 ```
 
-更新翻译：修改 `po/zh_CN.po` 后重新执行 `bash install.sh`（会用 msgfmt 编译到
-`~/.local/share/locale/`）。新增字符串后可参照 `po/bing-wallpaper@bigmalove.pot` 补充翻译。
+## Development
 
-设置面板中的按钮通过 `settings-schema.json` 里的 `callback` 字段调用 `enable()` 返回对象上的同名方法
-（`onRefreshNow`、`onShowInfo`、`onOpenBingPage`、`onOpenFolder`）。
+```bash
+bash install.sh --link     # install as a symlink to this checkout
+bash install.sh reload     # ask Cinnamon (via DBus) to reload the extension after editing
+```
+
+Translations: edit `po/zh_CN.po` (or add another language) and run `bash install.sh` again; it compiles the catalogs into
+`~/.local/share/locale/` with `msgfmt`. New strings can be extracted with `cinnamon-xlet-makepot` (needs `python3-polib`).
+
+The buttons in the settings dialog call methods of the object returned by `enable()` (`onRefreshNow`, `onOpenBingPage`,
+`onOpenFolder`), as declared in the `callback` fields of `settings-schema.json`.

@@ -4,9 +4,9 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: bing-wallpaper@bigmalove 1.0.0\n"
-"Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-04 18:26+0800\n"
-"PO-Revision-Date: 2026-09-04 18:30+0800\n"
+"Report-Msgid-Bugs-To: https://github.com/bigmalove/cinnamon-bing-wallpaper/issues\n"
+"POT-Creation-Date: 2026-09-04 19:10+0800\n"
+"PO-Revision-Date: 2026-09-04 19:10+0800\n"
 "Last-Translator: bigmalove\n"
 "Language-Team: Chinese (Simplified)\n"
 "Language: zh_CN\n"
@@ -23,21 +23,25 @@ msgstr "Bing 壁纸"
 msgid "Downloads the Bing image of the day and sets it as your desktop wallpaper automatically"
 msgstr "自动下载 Bing 每日一图并设为桌面壁纸"
 
-#: extension.js:194
+#: extension.js:478
 msgid "No Bing image has been downloaded yet."
 msgstr "尚未下载任何 Bing 图片。"
 
-#: extension.js:481
+#: extension.js:755
 msgid "Could not update the Bing wallpaper"
 msgstr "无法更新 Bing 壁纸"
 
-#: extension.js:482
+#: extension.js:756
 msgid "It will be retried automatically."
 msgstr "稍后将自动重试。"
 
-#: extension.js:507
+#: extension.js:781
 msgid "The wallpaper is already up to date"
 msgstr "壁纸已经是最新的"
+
+#: extension.js:881
+msgid "Bing image of the day"
+msgstr "Bing 每日一图"
 
 #: settings-schema.json->layout->page-general->title
 msgid "General"
@@ -54,6 +58,10 @@ msgstr "Bing 图片"
 #: settings-schema.json->layout->section-desktop->title
 msgid "Desktop"
 msgstr "桌面"
+
+#: settings-schema.json->layout->section-overlay->title
+msgid "Image information on the desktop"
+msgstr "桌面上的图片信息"
 
 #: settings-schema.json->layout->section-actions->title
 msgid "Actions"
@@ -199,9 +207,69 @@ msgstr "壁纸更换时显示通知"
 msgid "Refresh now"
 msgstr "立即刷新"
 
-#: settings-schema.json->show-info->description
-msgid "Show information about the current image"
-msgstr "显示当前图片信息"
+#: settings-schema.json->show-info-overlay->description
+msgid "Show the title and copyright of the current image on the desktop"
+msgstr "在桌面上显示当前图片的标题和版权信息"
+
+#: settings-schema.json->show-info-overlay->tooltip
+msgid "Plain text in the top-right corner of the primary monitor, below the panel. It sits on the desktop behind application windows."
+msgstr "在主显示器右上角（面板下方）以文字显示。文字位于桌面层，在应用程序窗口之后。"
+
+#: settings-schema.json->overlay-color->description
+msgid "Text color"
+msgstr "文字颜色"
+
+#: settings-schema.json->overlay-effect->description
+msgid "Text effect"
+msgstr "文字特效"
+
+#: settings-schema.json->overlay-effect->tooltip
+msgid "Makes the text easier to read on bright or busy wallpapers."
+msgstr "提高文字在明亮或复杂壁纸上的辨识度。"
+
+#: settings-schema.json->overlay-effect->options
+msgid "None"
+msgstr "无"
+
+#: settings-schema.json->overlay-effect->options
+msgid "Shadow"
+msgstr "阴影"
+
+#: settings-schema.json->overlay-effect->options
+msgid "Strong shadow"
+msgstr "阴影增强"
+
+#: settings-schema.json->overlay-effect->options
+msgid "Glow"
+msgstr "发光效果"
+
+#: settings-schema.json->overlay-effect->options
+msgid "Outline"
+msgstr "文字描边"
+
+#: settings-schema.json->overlay-effect->options
+msgid "Background block"
+msgstr "独立文字背景"
+
+#: settings-schema.json->overlay-chars-per-line->description
+msgid "Characters per line"
+msgstr "每行字数"
+
+#: settings-schema.json->overlay-chars-per-line->tooltip
+msgid "Lines are broken after this many characters. Spaces are preferred as break points when there are any."
+msgstr "每行最多显示的字符数，超过即换行；有空格时优先在空格处换行。"
+
+#: settings-schema.json->overlay-chars-per-line->units
+msgid "characters"
+msgstr "字"
+
+#: settings-schema.json->overlay-font-size->description
+msgid "Font size (0 = theme default)"
+msgstr "字号（0 = 跟随主题）"
+
+#: settings-schema.json->overlay-font-size->units
+msgid "pt"
+msgstr "pt"
 
 #: settings-schema.json->open-bing->description
 msgid "Open the image description on Bing"

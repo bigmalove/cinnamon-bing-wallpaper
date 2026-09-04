@@ -6,12 +6,14 @@
  *
  * Lifecycle: init() -> enable() -> ... -> disable()
  * The object returned by enable() exposes the callbacks used by the buttons in
- * settings-schema.json (onRefreshNow, onShowInfo, onOpenBingPage, onOpenFolder).
+ * settings-schema.json (onRefreshNow, onOpenBingPage, onOpenFolder).
  */
 
 const Gio = imports.gi.Gio;
 const GLib = imports.gi.GLib;
 const St = imports.gi.St;
+const Clutter = imports.gi.Clutter;
+const Pango = imports.gi.Pango;
 const Soup = imports.gi.Soup;
 const Gettext = imports.gettext;
 const Main = imports.ui.main;
@@ -41,6 +43,8 @@ const STARTUP_DELAY = 5;
 const NETWORK_DEBOUNCE = 10;
 // Only files matching this pattern (the ones we create) are ever deleted.
 const IMAGE_FILE_PATTERN = /^\d{8}_.+\.jpe?g$/i;
+// Distance of the desktop image information from the edges of the work area (px).
+const OVERLAY_MARGIN = 24;
 
 Gettext.bindtextdomain(UUID, GLib.get_home_dir() + "/.local/share/locale");
 
@@ -66,6 +70,43 @@ function logError(msg) {
 
 function bytesToString(bytes) {
     return ByteArray.toString(ByteArray.fromGBytes(bytes));
+}
+
+/**
+ * Breaks @text into lines of at most @maxChars characters (code points).
+ * Spaces are preferred as break points; words longer than the limit (and
+ * CJK text, which has no spaces) are cut hard.
+ */
+function wrapText(text, maxChars) {
+    if (!text)
+        return "";
+    maxChars = Math.max(4, parseInt(maxChars, 10) || 0);
+    let lines = [];
+    for (let paragraph of String(text).split("\n")) {
+        let line = "";
+        for (let word of paragraph.split(/\s+/).filter((w) => w.length > 0)) {
+            let chars = Array.from(word);
+            if (chars.length > maxChars) {
+                if (line) {
+                    lines.push(line);
+                    line = "";
+                }
+                while (chars.length > maxChars)
+                    lines.push(chars.splice(0, maxChars).join(""));
+                line = chars.join("");
+                continue;
+            }
+            let candidate = line ? line + " " + word : word;
+            if (Array.from(candidate).length > maxChars) {
+                lines.push(line);
+                line = word;
+            } else {
+                line = candidate;
+            }
+        }
+        lines.push(line);
+    }
+    return lines.join("\n");
 }
 
 /**
@@ -122,6 +163,241 @@ class HttpClient {
     }
 }
 
+/**
+ * Returns true when @color (a CSS colour string) is dark, so that shadows and
+ * outlines can use a contrasting tone.
+ */
+function isDarkColor(color) {
+    try {
+        let [ok, parsed] = Clutter.Color.from_string(color || "");
+        if (!ok)
+            return false;
+        let luminance = (0.299 * parsed.red + 0.587 * parsed.green + 0.114 * parsed.blue) / 255;
+        return luminance < 0.5;
+    } catch (e) {
+        return false;
+    }
+}
+
+/**
+ * Describes a text effect: extra copies of the text painted below the real one
+ * (each with an offset and its own style), the style of the real text and the
+ * style of the surrounding box. Shadows and outlines pick a tone that contrasts
+ * with @textColor.
+ */
+function buildTextEffect(name, textColor) {
+    let dark = isDarkColor(textColor);
+    let tone = dark ? "255, 255, 255" : "0, 0, 0";
+    let rgba = (alpha) => "rgba(" + tone + ", " + alpha + ")";
+    let shadowLayer = (alpha, blur) => ({
+        dx: 0, dy: 0,
+        style: "color: " + rgba(alpha) + "; text-shadow: 0 0 " + blur + "px " + rgba(alpha) + ";"
+    });
+
+    switch (name) {
+        case "none":
+            return { layers: [], main: "", box: "" };
+        case "strong-shadow":
+            return {
+                layers: [shadowLayer(0.9, 4), shadowLayer(0.7, 10)],
+                main: "text-shadow: 0 2px 4px " + rgba(0.6) + ";",
+                box: ""
+            };
+        case "glow":
+            return {
+                layers: [
+                    { dx: 0, dy: 0, style: "color: rgba(255, 255, 255, 0.8); text-shadow: 0 0 5px rgba(255, 255, 255, 0.8);" },
+                    { dx: 0, dy: 0, style: "color: rgba(255, 255, 255, 0.6); text-shadow: 0 0 10px rgba(255, 255, 255, 0.6);" },
+                    { dx: 0, dy: 0, style: "color: rgba(0, 210, 255, 0.4); text-shadow: 0 0 20px rgba(0, 210, 255, 0.4);" }
+                ],
+                main: "",
+                box: ""
+            };
+        case "outline": {
+            let w = 1.5;
+            let style = "color: " + rgba(0.85) + ";";
+            let layers = [[-w, 0], [w, 0], [0, -w], [0, w], [-w, -w], [w, -w], [-w, w], [w, w]]
+                .map(([dx, dy]) => ({ dx: dx, dy: dy, style: style }));
+            return { layers: layers, main: "text-shadow: 0 2px 4px " + rgba(0.3) + ";", box: "" };
+        }
+        case "background":
+            return {
+                layers: [],
+                main: "text-shadow: 0 1px 2px " + rgba(0.3) + ";",
+                box: "background-color: " + (dark ? "rgba(255, 255, 255, 0.65)" : "rgba(0, 0, 0, 0.55)") +
+                    "; padding: 8px 12px; border-radius: 8px;"
+            };
+        case "shadow":
+        default:
+            return { layers: [], main: "text-shadow: 0 1px 3px " + rgba(0.8) + ";", box: "" };
+    }
+}
+
+/**
+ * A right-aligned, multi-line label that can paint extra copies of its text
+ * underneath itself (offset and styled per effect layer) to produce outlines
+ * and layered shadows, which plain St CSS cannot express.
+ */
+class EffectLabel {
+    constructor(styleClass) {
+        this._styleClass = styleClass;
+        this._text = "";
+        this._layers = [];
+        this.actor = new St.Widget({ layout_manager: new Clutter.BinLayout() });
+        this._main = this._createLabel();
+        this.actor.add_child(this._main);
+    }
+
+    _createLabel() {
+        let label = new St.Label({ style_class: this._styleClass });
+        label.clutter_text.line_wrap = true;
+        label.clutter_text.line_wrap_mode = Pango.WrapMode.WORD_CHAR;
+        label.clutter_text.ellipsize = Pango.EllipsizeMode.NONE;
+        label.clutter_text.line_alignment = Pango.Alignment.RIGHT;
+        return label;
+    }
+
+    setText(text) {
+        this._text = text || "";
+        this._main.set_text(this._text);
+        for (let layer of this._layers)
+            layer.set_text(this._text);
+    }
+
+    setEffect(layers, mainStyle) {
+        for (let layer of this._layers)
+            layer.destroy();
+        this._layers = [];
+        for (let spec of layers) {
+            let label = this._createLabel();
+            label.set_style(spec.style);
+            label.set_translation(spec.dx, spec.dy, 0);
+            label.set_text(this._text);
+            this.actor.insert_child_below(label, this._main);
+            this._layers.push(label);
+        }
+        this._main.set_style(mainStyle || "");
+    }
+
+    setVisible(visible) {
+        this.actor.visible = !!visible;
+    }
+
+    getText() {
+        return this._text;
+    }
+}
+
+/**
+ * Title, copyright and date of the current image drawn as text in the top-right
+ * corner of the primary monitor. The actor lives in Cinnamon's desklet layer,
+ * i.e. on the desktop below application windows, and never takes input.
+ */
+class InfoOverlay {
+    constructor() {
+        // A transparent, non-reactive bin covering the work area; the text block is
+        // aligned to its top-right corner so that its width can follow the text.
+        this.actor = new St.Bin({
+            reactive: false,
+            x_fill: false,
+            y_fill: false,
+            x_align: St.Align.END,
+            y_align: St.Align.START
+        });
+        // The desklet container expects its children to look like desklets.
+        this.actor._delegate = { _draggable: { inhibit: true } };
+
+        this._box = new St.BoxLayout({ vertical: true, style_class: "bing-wallpaper-info" });
+        this.actor.set_child(this._box);
+
+        this._title = new EffectLabel("bing-wallpaper-info-title");
+        this._copyright = new EffectLabel("bing-wallpaper-info-copyright");
+        this._date = new EffectLabel("bing-wallpaper-info-date");
+        this._labels = [this._title, this._copyright, this._date];
+        for (let label of this._labels)
+            this._box.add(label.actor, { x_fill: false, x_align: St.Align.END });
+        this.actor.hide();
+
+        this._container = Main.deskletContainer ? Main.deskletContainer.actor : Main.uiGroup;
+        this._container.add_actor(this.actor);
+
+        this._monitorsChangedId = Main.layoutManager.connect("monitors-changed", () => this.reposition());
+        this._workareasChangedId = 0;
+        try {
+            this._workareasChangedId = global.display.connect("workareas-changed", () => this.reposition());
+        } catch (e) {
+            // older Cinnamon without this signal: monitors-changed is still handled
+        }
+        this.reposition();
+    }
+
+    setStyle(color, fontSizePt, effectName) {
+        color = color || "#ffffff";
+        let effect = buildTextEffect(effectName, color);
+        let style = "color: " + color + ";";
+        if (fontSizePt > 0)
+            style += " font-size: " + fontSizePt + "pt;";
+        this._box.set_style(style + " " + effect.box);
+        for (let label of this._labels)
+            label.setEffect(effect.layers, effect.main);
+    }
+
+    update(title, copyright, dateLine) {
+        this._title.setText(title);
+        this._title.setVisible(!!title);
+        this._copyright.setText(copyright);
+        this._copyright.setVisible(!!copyright);
+        this._date.setText(dateLine);
+        this._date.setVisible(!!dateLine);
+
+        if (title || copyright) {
+            this.actor.show();
+            this.reposition();
+        } else {
+            this.actor.hide();
+        }
+    }
+
+    reposition() {
+        if (!this.actor)
+            return;
+        let area = this._workArea();
+        if (!area)
+            return;
+        this.actor.set_position(area.x + OVERLAY_MARGIN, area.y + OVERLAY_MARGIN);
+        this.actor.set_size(Math.max(1, area.width - 2 * OVERLAY_MARGIN),
+            Math.max(1, area.height - 2 * OVERLAY_MARGIN));
+    }
+
+    _workArea() {
+        let monitor = Main.layoutManager.primaryMonitor;
+        if (!monitor)
+            return null;
+        try {
+            let manager = global.workspace_manager || global.screen;
+            let area = manager.get_active_workspace().get_work_area_for_monitor(Main.layoutManager.primaryIndex);
+            if (area && area.width > 0)
+                return area;
+        } catch (e) {
+            // fall through to the full monitor geometry
+        }
+        return { x: monitor.x, y: monitor.y, width: monitor.width, height: monitor.height };
+    }
+
+    destroy() {
+        if (this._monitorsChangedId)
+            Main.layoutManager.disconnect(this._monitorsChangedId);
+        if (this._workareasChangedId)
+            global.display.disconnect(this._workareasChangedId);
+        this._monitorsChangedId = 0;
+        this._workareasChangedId = 0;
+        if (this.actor) {
+            this.actor.destroy();
+            this.actor = null;
+        }
+    }
+}
+
 class BingWallpaperExtension {
     constructor(metadata) {
         this.metadata = metadata;
@@ -137,6 +413,7 @@ class BingWallpaperExtension {
         this._failures = 0;
         this._lastSuccess = 0;
         this._enabled = false;
+        this._overlay = null;
 
         this.settings = new Settings.ExtensionSettings(this, UUID);
         this.settings.bind("market", "market", () => this._onSourceChanged());
@@ -147,6 +424,11 @@ class BingWallpaperExtension {
         this.settings.bind("keep-count", "keepCount", () => this._pruneOldImages());
         this.settings.bind("check-interval", "checkInterval", () => this._scheduleCheck());
         this.settings.bind("skip-metered", "skipMetered");
+        this.settings.bind("show-info-overlay", "showInfoOverlay", () => this._updateOverlay());
+        this.settings.bind("overlay-color", "overlayColor", () => this._updateOverlayStyle());
+        this.settings.bind("overlay-effect", "overlayEffect", () => this._updateOverlayStyle());
+        this.settings.bind("overlay-font-size", "overlayFontSize", () => this._updateOverlayStyle());
+        this.settings.bind("overlay-chars-per-line", "overlayCharsPerLine", () => this._updateOverlay());
         // Persisted state about the image currently in use.
         this.settings.bind("last-date", "lastDate");
         this.settings.bind("last-file", "lastFile");
@@ -162,6 +444,7 @@ class BingWallpaperExtension {
         this._networkSignalId = this._networkMonitor.connect("network-changed",
             (monitor, available) => this._onNetworkChanged(available));
         this._scheduleCheck(STARTUP_DELAY);
+        this._updateOverlay();
         logInfo("Enabled (libsoup " + Soup.MAJOR_VERSION + ")");
     }
 
@@ -179,6 +462,7 @@ class BingWallpaperExtension {
         this._http.abort();
         this._busy = false;
         this._queued = null;
+        this._destroyOverlay();
         this.settings.finalize();
         logInfo("Disabled");
     }
@@ -187,17 +471,6 @@ class BingWallpaperExtension {
 
     onRefreshNow() {
         this.checkForNewWallpaper({ reapply: true, interactive: true });
-    }
-
-    onShowInfo() {
-        if (!this.lastFile) {
-            this._notify(_("Bing Wallpaper"), _("No Bing image has been downloaded yet."));
-            return;
-        }
-        let file = Gio.File.new_for_path(this.lastFile);
-        let body = this.lastCopyright || "";
-        body += (body ? "\n" : "") + this.lastFile;
-        this._notify(this.lastTitle || _("Bing Wallpaper"), body, file);
     }
 
     onOpenBingPage() {
@@ -450,6 +723,7 @@ class BingWallpaperExtension {
         this.lastTitle = info.title;
         this.lastCopyright = info.copyright;
         this.lastLink = info.link;
+        this._updateOverlay();
 
         if (changed)
             logInfo("Wallpaper set to " + file.get_path());
@@ -585,6 +859,60 @@ class BingWallpaperExtension {
             } catch (e) {
                 logWarn("Could not remove " + names[i] + ": " + e.message);
             }
+        }
+    }
+
+    /* ------------------------------------------------------- desktop info card */
+
+    _updateOverlay() {
+        if (!this._enabled || !this.showInfoOverlay) {
+            this._destroyOverlay();
+            return;
+        }
+        try {
+            if (!this._overlay) {
+                this._overlay = new InfoOverlay();
+                this._updateOverlayStyle();
+            }
+            let chars = parseInt(this.overlayCharsPerLine, 10);
+            if (isNaN(chars) || chars < 4)
+                chars = 24;
+            let dateText = this._formatDate(this.lastDate);
+            let dateLine = dateText ? _("Bing image of the day") + "  ·  " + dateText : _("Bing image of the day");
+            this._overlay.update(wrapText(this.lastTitle, chars), wrapText(this.lastCopyright, chars),
+                wrapText(dateLine, chars));
+        } catch (e) {
+            logWarn("Could not show the image information: " + e.message);
+        }
+    }
+
+    _updateOverlayStyle() {
+        if (!this._overlay)
+            return;
+        let fontSize = parseInt(this.overlayFontSize, 10);
+        if (isNaN(fontSize) || fontSize < 0)
+            fontSize = 0;
+        this._overlay.setStyle(this.overlayColor, fontSize, this.overlayEffect);
+    }
+
+    _destroyOverlay() {
+        if (this._overlay) {
+            this._overlay.destroy();
+            this._overlay = null;
+        }
+    }
+
+    _formatDate(yyyymmdd) {
+        let match = /^(\d{4})(\d{2})(\d{2})$/.exec(yyyymmdd || "");
+        if (!match)
+            return "";
+        let iso = match[1] + "-" + match[2] + "-" + match[3];
+        try {
+            let date = GLib.DateTime.new_local(parseInt(match[1], 10), parseInt(match[2], 10),
+                parseInt(match[3], 10), 0, 0, 0);
+            return (date && date.format("%x")) || iso;
+        } catch (e) {
+            return iso;
         }
     }
 

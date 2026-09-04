@@ -5,8 +5,8 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: bing-wallpaper@bigmalove 1.0.0\n"
-"Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-09-04 18:26+0800\n"
+"Report-Msgid-Bugs-To: https://github.com/bigmalove/cinnamon-bing-wallpaper/issues\n"
+"POT-Creation-Date: 2026-09-04 19:10+0800\n"
 "PO-Revision-Date: \n"
 "Last-Translator: \n"
 "Language-Team: \n"
@@ -23,20 +23,24 @@ msgstr ""
 msgid "Downloads the Bing image of the day and sets it as your desktop wallpaper automatically"
 msgstr ""
 
-#: extension.js:194
+#: extension.js:478
 msgid "No Bing image has been downloaded yet."
 msgstr ""
 
-#: extension.js:481
+#: extension.js:755
 msgid "Could not update the Bing wallpaper"
 msgstr ""
 
-#: extension.js:482
+#: extension.js:756
 msgid "It will be retried automatically."
 msgstr ""
 
-#: extension.js:507
+#: extension.js:781
 msgid "The wallpaper is already up to date"
+msgstr ""
+
+#: extension.js:881
+msgid "Bing image of the day"
 msgstr ""
 
 #: settings-schema.json->layout->page-general->title
@@ -53,6 +57,10 @@ msgstr ""
 
 #: settings-schema.json->layout->section-desktop->title
 msgid "Desktop"
+msgstr ""
+
+#: settings-schema.json->layout->section-overlay->title
+msgid "Image information on the desktop"
 msgstr ""
 
 #: settings-schema.json->layout->section-actions->title
@@ -199,8 +207,68 @@ msgstr ""
 msgid "Refresh now"
 msgstr ""
 
-#: settings-schema.json->show-info->description
-msgid "Show information about the current image"
+#: settings-schema.json->show-info-overlay->description
+msgid "Show the title and copyright of the current image on the desktop"
+msgstr ""
+
+#: settings-schema.json->show-info-overlay->tooltip
+msgid "Plain text in the top-right corner of the primary monitor, below the panel. It sits on the desktop behind application windows."
+msgstr ""
+
+#: settings-schema.json->overlay-color->description
+msgid "Text color"
+msgstr ""
+
+#: settings-schema.json->overlay-effect->description
+msgid "Text effect"
+msgstr ""
+
+#: settings-schema.json->overlay-effect->tooltip
+msgid "Makes the text easier to read on bright or busy wallpapers."
+msgstr ""
+
+#: settings-schema.json->overlay-effect->options
+msgid "None"
+msgstr ""
+
+#: settings-schema.json->overlay-effect->options
+msgid "Shadow"
+msgstr ""
+
+#: settings-schema.json->overlay-effect->options
+msgid "Strong shadow"
+msgstr ""
+
+#: settings-schema.json->overlay-effect->options
+msgid "Glow"
+msgstr ""
+
+#: settings-schema.json->overlay-effect->options
+msgid "Outline"
+msgstr ""
+
+#: settings-schema.json->overlay-effect->options
+msgid "Background block"
+msgstr ""
+
+#: settings-schema.json->overlay-chars-per-line->description
+msgid "Characters per line"
+msgstr ""
+
+#: settings-schema.json->overlay-chars-per-line->tooltip
+msgid "Lines are broken after this many characters. Spaces are preferred as break points when there are any."
+msgstr ""
+
+#: settings-schema.json->overlay-chars-per-line->units
+msgid "characters"
+msgstr ""
+
+#: settings-schema.json->overlay-font-size->description
+msgid "Font size (0 = theme default)"
+msgstr ""
+
+#: settings-schema.json->overlay-font-size->units
+msgid "pt"
 msgstr ""
 
 #: settings-schema.json->open-bing->description

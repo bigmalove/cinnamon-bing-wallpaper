@@ -1,41 +1,79 @@
 {
     "layout": {
         "type": "layout",
-        "pages": ["page-general", "page-storage"],
+        "pages": [
+            "page-general",
+            "page-storage"
+        ],
         "page-general": {
             "type": "page",
             "title": "General",
-            "sections": ["section-image", "section-desktop", "section-actions"]
+            "sections": [
+                "section-image",
+                "section-desktop",
+                "section-overlay",
+                "section-actions"
+            ]
         },
         "page-storage": {
             "type": "page",
             "title": "Storage and updates",
-            "sections": ["section-folder", "section-updates"]
+            "sections": [
+                "section-folder",
+                "section-updates"
+            ]
         },
         "section-image": {
             "type": "section",
             "title": "Bing image",
-            "keys": ["market", "resolution"]
+            "keys": [
+                "market",
+                "resolution"
+            ]
         },
         "section-desktop": {
             "type": "section",
             "title": "Desktop",
-            "keys": ["picture-options", "notify-on-change"]
+            "keys": [
+                "picture-options",
+                "notify-on-change"
+            ]
+        },
+        "section-overlay": {
+            "type": "section",
+            "title": "Image information on the desktop",
+            "keys": [
+                "show-info-overlay",
+                "overlay-color",
+                "overlay-effect",
+                "overlay-chars-per-line",
+                "overlay-font-size"
+            ]
         },
         "section-actions": {
             "type": "section",
             "title": "Actions",
-            "keys": ["refresh-now", "show-info", "open-bing", "open-folder"]
+            "keys": [
+                "refresh-now",
+                "open-bing",
+                "open-folder"
+            ]
         },
         "section-folder": {
             "type": "section",
             "title": "Download folder",
-            "keys": ["save-dir", "keep-count"]
+            "keys": [
+                "save-dir",
+                "keep-count"
+            ]
         },
         "section-updates": {
             "type": "section",
             "title": "Update checks",
-            "keys": ["check-interval", "skip-metered"]
+            "keys": [
+                "check-interval",
+                "skip-metered"
+            ]
         }
     },
     "market": {
@@ -97,10 +135,53 @@
         "description": "Refresh now",
         "callback": "onRefreshNow"
     },
-    "show-info": {
-        "type": "button",
-        "description": "Show information about the current image",
-        "callback": "onShowInfo"
+    "show-info-overlay": {
+        "type": "switch",
+        "default": false,
+        "description": "Show the title and copyright of the current image on the desktop",
+        "tooltip": "Plain text in the top-right corner of the primary monitor, below the panel. It sits on the desktop behind application windows."
+    },
+    "overlay-color": {
+        "type": "colorchooser",
+        "default": "rgb(255,255,255)",
+        "description": "Text color",
+        "dependency": "show-info-overlay"
+    },
+    "overlay-effect": {
+        "type": "combobox",
+        "default": "shadow",
+        "description": "Text effect",
+        "tooltip": "Makes the text easier to read on bright or busy wallpapers.",
+        "options": {
+            "None": "none",
+            "Shadow": "shadow",
+            "Strong shadow": "strong-shadow",
+            "Glow": "glow",
+            "Outline": "outline",
+            "Background block": "background"
+        },
+        "dependency": "show-info-overlay"
+    },
+    "overlay-chars-per-line": {
+        "type": "spinbutton",
+        "default": 24,
+        "min": 4,
+        "max": 200,
+        "step": 1,
+        "units": "characters",
+        "description": "Characters per line",
+        "tooltip": "Lines are broken after this many characters. Spaces are preferred as break points when there are any.",
+        "dependency": "show-info-overlay"
+    },
+    "overlay-font-size": {
+        "type": "spinbutton",
+        "default": 12,
+        "min": 0,
+        "max": 96,
+        "step": 1,
+        "units": "pt",
+        "description": "Font size (0 = theme default)",
+        "dependency": "show-info-overlay"
     },
     "open-bing": {
         "type": "button",
