@@ -20,6 +20,9 @@ cinnamon-bing-wallpaper/
 ├── install.sh                          # install / update / uninstall helper
 ├── README.md                           # this file
 ├── README.zh-CN.md                     # Chinese documentation
+├── LICENSE                             # GPL-2.0-or-later
+├── spice/                              # info.json, README and screenshot for Cinnamon Spices
+├── tools/export-spice.sh               # copies the extension into a cinnamon-spices-extensions checkout
 └── bing-wallpaper@bigmalove/           # the extension itself (UUID = folder name)
     ├── metadata.json                   # name, author, compatible Cinnamon versions
     ├── extension.js                    # main logic
@@ -100,3 +103,16 @@ Translations: edit `po/zh_CN.po` (or add another language) and run `bash install
 
 The buttons in the settings dialog call methods of the object returned by `enable()` (`onRefreshNow`, `onOpenBingPage`,
 `onOpenFolder`), as declared in the `callback` fields of `settings-schema.json`.
+
+### Publishing to Cinnamon Spices
+
+```bash
+tools/export-spice.sh /path/to/cinnamon-spices-extensions   # copies files into the Spices layout and runs validate-spice
+```
+
+The extension is submitted to <https://github.com/linuxmint/cinnamon-spices-extensions> as `bing-wallpaper@bigmalove`;
+the files under `spice/` are the Spices-level `info.json`, `README.md` and `screenshot.png`.
+
+## License
+
+GPL-2.0-or-later, see `LICENSE`.

@@ -1,5 +1,7 @@
 /*
  * Bing Wallpaper - Cinnamon extension
+ * Copyright (C) 2026 bigmalove
+ * SPDX-License-Identifier: GPL-2.0-or-later
  *
  * Downloads the Bing "image of the day" and sets it as the desktop background.
  * Works on Cinnamon 5.x (libsoup 2.4) and Cinnamon 6.x (libsoup 3).
@@ -19,7 +21,6 @@ const Gettext = imports.gettext;
 const Main = imports.ui.main;
 const MessageTray = imports.ui.messageTray;
 const Settings = imports.ui.settings;
-const Util = imports.misc.util;
 const ByteArray = imports.byteArray;
 
 const UUID = "bing-wallpaper@bigmalove";
@@ -161,6 +162,46 @@ class HttpClient {
     abort() {
         this._session.abort();
     }
+}
+
+/**
+ * Creates @dir and any missing parents without blocking; callback(error).
+ * An existing directory is not an error.
+ */
+function ensureDirectoryAsync(dir, callback) {
+    dir.make_directory_async(GLib.PRIORITY_DEFAULT, null, (d, result) => {
+        try {
+            d.make_directory_finish(result);
+            callback(null);
+        } catch (e) {
+            if (e.matches(Gio.IOErrorEnum, Gio.IOErrorEnum.EXISTS)) {
+                callback(null);
+            } else if (e.matches(Gio.IOErrorEnum, Gio.IOErrorEnum.NOT_FOUND) && d.get_parent()) {
+                ensureDirectoryAsync(d.get_parent(), (error) => {
+                    if (error)
+                        callback(error);
+                    else
+                        ensureDirectoryAsync(d, callback);
+                });
+            } else {
+                callback(e);
+            }
+        }
+    });
+}
+
+/** callback(exists) - whether @file currently exists, checked without blocking. */
+function fileExistsAsync(file, callback) {
+    file.query_info_async("standard::type", Gio.FileQueryInfoFlags.NONE, GLib.PRIORITY_DEFAULT, null,
+        (f, result) => {
+            let exists = true;
+            try {
+                f.query_info_finish(result);
+            } catch (e) {
+                exists = false;
+            }
+            callback(exists);
+        });
 }
 
 /**
@@ -414,6 +455,7 @@ class BingWallpaperExtension {
         this._lastSuccess = 0;
         this._enabled = false;
         this._overlay = null;
+        this._pruning = false;
 
         this.settings = new Settings.ExtensionSettings(this, UUID);
         this.settings.bind("market", "market", () => this._onSourceChanged());
@@ -482,11 +524,18 @@ class BingWallpaperExtension {
     }
 
     onOpenFolder() {
+        let dir;
         try {
-            this._openUri(this._getSaveDir(true).get_uri());
+            dir = this._saveDirFile();
         } catch (e) {
             logWarn("Could not open the wallpaper folder: " + e.message);
+            return;
         }
+        ensureDirectoryAsync(dir, (error) => {
+            if (error)
+                logWarn("Could not create the wallpaper folder: " + error.message);
+            this._openUri(dir.get_uri());
+        });
     }
 
     /* ------------------------------------------------------------ scheduling */
@@ -630,36 +679,51 @@ class BingWallpaperExtension {
     }
 
     _processImage(info, options) {
-        let file;
+        let dir;
         try {
-            file = this._getSaveDir(true).get_child(this._fileNameFor(info));
+            dir = this._saveDirFile();
         } catch (e) {
             this._finish(e, options);
             return;
         }
+        let file = dir.get_child(this._fileNameFor(info));
 
-        if (file.query_exists(null)) {
-            if (this.lastFile === file.get_path() && !options.reapply) {
-                // Today's image is already in place. If the user picked another wallpaper
-                // by hand in the meantime we leave it alone until a new image arrives.
-                this._finish(null, options, { file: file, info: info, changed: false });
+        ensureDirectoryAsync(dir, (error) => {
+            if (!this._enabled)
                 return;
-            }
-            let changed = this._applyWallpaper(file, info);
-            this._finish(null, options, { file: file, info: info, changed: changed });
-            return;
-        }
-
-        let resolutions = [this.resolution].concat(
-            FALLBACK_RESOLUTIONS.filter((r) => r !== this.resolution));
-        this._downloadImage(info, resolutions, file, (error) => {
             if (error) {
                 this._finish(error, options);
                 return;
             }
-            logInfo("Downloaded " + file.get_path());
-            let changed = this._applyWallpaper(file, info);
-            this._finish(null, options, { file: file, info: info, changed: changed });
+            fileExistsAsync(file, (exists) => {
+                if (!this._enabled)
+                    return;
+                if (exists) {
+                    if (this.lastFile === file.get_path() && !options.reapply) {
+                        // Today's image is already in place. If the user picked another wallpaper
+                        // by hand in the meantime we leave it alone until a new image arrives.
+                        this._finish(null, options, { file: file, info: info, changed: false });
+                        return;
+                    }
+                    let changed = this._applyWallpaper(file, info);
+                    this._finish(null, options, { file: file, info: info, changed: changed });
+                    return;
+                }
+
+                let resolutions = [this.resolution].concat(
+                    FALLBACK_RESOLUTIONS.filter((r) => r !== this.resolution));
+                this._downloadImage(info, resolutions, file, (downloadError) => {
+                    if (!this._enabled)
+                        return;
+                    if (downloadError) {
+                        this._finish(downloadError, options);
+                        return;
+                    }
+                    logInfo("Downloaded " + file.get_path());
+                    let changed = this._applyWallpaper(file, info);
+                    this._finish(null, options, { file: file, info: info, changed: changed });
+                });
+            });
         });
     }
 
@@ -745,6 +809,8 @@ class BingWallpaperExtension {
 
     _finish(error, options, result) {
         this._busy = false;
+        if (!this._enabled)
+            return;
 
         if (error) {
             this._failures++;
@@ -784,7 +850,8 @@ class BingWallpaperExtension {
 
     /* ----------------------------------------------------------- file handling */
 
-    _getSaveDir(create) {
+    /** The configured wallpaper folder as a Gio.File (no I/O). Throws if it is not a local path. */
+    _saveDirFile() {
         let value = (this.saveDirSetting || "").trim();
         let dir;
 
@@ -801,64 +868,94 @@ class BingWallpaperExtension {
 
         if (!dir.get_path())
             throw new Error("The wallpaper folder must be on the local file system: " + value);
-
-        if (create && !dir.query_exists(null)) {
-            try {
-                dir.make_directory_with_parents(null);
-            } catch (e) {
-                if (!e.matches || !e.matches(Gio.IOErrorEnum, Gio.IOErrorEnum.EXISTS))
-                    throw e;
-            }
-        }
         return dir;
     }
 
     _pruneOldImages() {
+        if (this._pruning || !this._enabled)
+            return;
+        let dir;
+        try {
+            dir = this._saveDirFile();
+        } catch (e) {
+            return;
+        }
         let keep = parseInt(this.keepCount, 10);
         if (isNaN(keep) || keep < 1)
             keep = 1;
 
-        let dir;
-        try {
-            dir = this._getSaveDir(false);
-        } catch (e) {
-            return;
-        }
-        if (!dir.query_exists(null))
-            return;
-
+        this._pruning = true;
         let names = [];
-        try {
-            let enumerator = dir.enumerate_children("standard::name,standard::type",
-                Gio.FileQueryInfoFlags.NOFOLLOW_SYMLINKS, null);
-            let fileInfo;
-            while ((fileInfo = enumerator.next_file(null)) !== null) {
-                if (fileInfo.get_file_type() !== Gio.FileType.REGULAR)
-                    continue;
-                let name = fileInfo.get_name();
-                if (IMAGE_FILE_PATTERN.test(name))
-                    names.push(name);
-            }
-            enumerator.close(null);
-        } catch (e) {
-            logWarn("Could not list the wallpaper folder: " + e.message);
-            return;
-        }
+        let done = () => { this._pruning = false; };
 
+        dir.enumerate_children_async("standard::name,standard::type", Gio.FileQueryInfoFlags.NOFOLLOW_SYMLINKS,
+            GLib.PRIORITY_LOW, null, (d, result) => {
+                let enumerator;
+                try {
+                    enumerator = d.enumerate_children_finish(result);
+                } catch (e) {
+                    if (!e.matches(Gio.IOErrorEnum, Gio.IOErrorEnum.NOT_FOUND))
+                        logWarn("Could not list the wallpaper folder: " + e.message);
+                    done();
+                    return;
+                }
+                let readMore = () => {
+                    enumerator.next_files_async(50, GLib.PRIORITY_LOW, null, (en, res) => {
+                        let infos;
+                        try {
+                            infos = en.next_files_finish(res);
+                        } catch (e) {
+                            logWarn("Could not list the wallpaper folder: " + e.message);
+                            infos = [];
+                        }
+                        if (infos.length === 0) {
+                            en.close_async(GLib.PRIORITY_LOW, null, (source, closeResult) => {
+                                try {
+                                    source.close_finish(closeResult);
+                                } catch (e) {
+                                    // nothing useful to do
+                                }
+                            });
+                            this._deleteOldImages(dir, names, keep, done);
+                            return;
+                        }
+                        for (let fileInfo of infos) {
+                            if (fileInfo.get_file_type() === Gio.FileType.REGULAR &&
+                                IMAGE_FILE_PATTERN.test(fileInfo.get_name()))
+                                names.push(fileInfo.get_name());
+                        }
+                        readMore();
+                    });
+                };
+                readMore();
+            });
+    }
+
+    _deleteOldImages(dir, names, keep, done) {
         // File names start with YYYYMMDD, so sorting puts the oldest first.
         names.sort();
         let current = this.lastFile ? GLib.path_get_basename(this.lastFile) : null;
-        let excess = names.length - keep;
-        for (let i = 0; i < names.length && excess > 0; i++) {
-            if (names[i] === current)
-                continue;
-            try {
-                dir.get_child(names[i]).delete(null);
-                excess--;
-                logInfo("Removed old image " + names[i]);
-            } catch (e) {
-                logWarn("Could not remove " + names[i] + ": " + e.message);
-            }
+        let victims = [];
+        for (let i = 0; i < names.length && victims.length < names.length - keep; i++) {
+            if (names[i] !== current)
+                victims.push(names[i]);
+        }
+        let pending = victims.length;
+        if (pending === 0) {
+            done();
+            return;
+        }
+        for (let name of victims) {
+            dir.get_child(name).delete_async(GLib.PRIORITY_LOW, null, (f, result) => {
+                try {
+                    f.delete_finish(result);
+                    logInfo("Removed old image " + name);
+                } catch (e) {
+                    logWarn("Could not remove " + name + ": " + e.message);
+                }
+                if (--pending === 0)
+                    done();
+            });
         }
     }
 
@@ -920,9 +1017,19 @@ class BingWallpaperExtension {
 
     _openUri(uri) {
         try {
-            Gio.AppInfo.launch_default_for_uri(uri, null);
+            if (typeof Gio.AppInfo.launch_default_for_uri_async === "function") {
+                Gio.AppInfo.launch_default_for_uri_async(uri, null, null, (source, result) => {
+                    try {
+                        Gio.AppInfo.launch_default_for_uri_finish(result);
+                    } catch (e) {
+                        logWarn("Could not open " + uri + ": " + e.message);
+                    }
+                });
+            } else {
+                Gio.AppInfo.launch_default_for_uri(uri, null);
+            }
         } catch (e) {
-            Util.spawnCommandLine("xdg-open " + GLib.shell_quote(uri));
+            logWarn("Could not open " + uri + ": " + e.message);
         }
     }
 

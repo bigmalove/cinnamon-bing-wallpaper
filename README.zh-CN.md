@@ -20,6 +20,9 @@ cinnamon-bing-wallpaper/
 ├── install.sh                          # 安装 / 更新 / 卸载脚本
 ├── README.md                           # 英文说明
 ├── README.zh-CN.md                     # 本文件
+├── LICENSE                             # GPL-2.0-or-later
+├── spice/                              # 提交到 Cinnamon Spices 用的 info.json、README、截图
+├── tools/export-spice.sh               # 把扩展复制进 cinnamon-spices-extensions 仓库的脚本
 └── bing-wallpaper@bigmalove/           # 扩展本体（UUID = 目录名）
     ├── metadata.json                   # 名称、作者、兼容的 Cinnamon 版本
     ├── extension.js                    # 主逻辑
@@ -100,3 +103,16 @@ bash install.sh reload     # 通过 DBus 让 Cinnamon 重新加载扩展
 
 设置面板中的按钮通过 `settings-schema.json` 里的 `callback` 字段调用 `enable()` 返回对象上的同名方法
 （`onRefreshNow`、`onOpenBingPage`、`onOpenFolder`）。
+
+### 发布到 Cinnamon Spices
+
+```bash
+tools/export-spice.sh /path/to/cinnamon-spices-extensions   # 按 Spices 目录结构复制并运行 validate-spice
+```
+
+扩展以 `bing-wallpaper@bigmalove` 提交到 <https://github.com/linuxmint/cinnamon-spices-extensions>；
+`spice/` 目录下是 Spices 层面的 `info.json`、`README.md` 和 `screenshot.png`。
+
+## 许可证
+
+GPL-2.0-or-later，见 `LICENSE`。
